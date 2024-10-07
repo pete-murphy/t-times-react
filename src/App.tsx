@@ -72,7 +72,7 @@ export function App() {
                   route.attributes.long_name.replace(/ Line$/, ""),
                 ]
                   .filter(Boolean)
-                  .slice(0, 1);
+                  .at(0);
                 return (
                   <article
                     key={routeId}
