@@ -3,12 +3,13 @@ import { match } from "ts-pattern";
 import * as d3 from "d3";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import "@github/relative-time-element";
-import { CopyToClipboard } from "./CopyToClipboard";
-// import * as Fa6 from "react-icons/fa6";
+// import { CopyToClipboard } from "./CopyToClipboard";
+import * as Fa6 from "react-icons/fa6";
 
 export function App() {
-  const location = useLocation();
-  const predictionsResponse = usePredictions(location);
+  const currentPosition = useCurrentPosition();
+  const predictionsResponse = usePredictions(currentPosition);
+  const travelTimes = useTravelTimes(currentPosition, predictionsResponse);
 
   if (!predictionsResponse) {
     return <main>Loading...</main>;
@@ -32,18 +33,20 @@ export function App() {
             Times
           </span>
         </h1>
-        {location && (
+        {/* {currentPosition && (
           <div className="flex items-center gap-2">
             <span>
-              {location.coords.longitude}, {location.coords.latitude}
+              {currentPosition.coords.longitude},{" "}
+              {currentPosition.coords.latitude}
             </span>
             <CopyToClipboard
-              text={[location.coords.longitude, location.coords.latitude].join(
-                ","
-              )}
+              text={[
+                currentPosition.coords.longitude,
+                currentPosition.coords.latitude,
+              ].join(",")}
             />
           </div>
-        )}
+        )} */}
       </header>
       <ErrorBoundary
         fallbackRender={(props: FallbackProps) => {
@@ -55,133 +58,118 @@ export function App() {
           );
         }}
       >
-        <main className="p-2">
+        <main className="p-2 flex flex-col gap-8">
           {predictionsResponse && (
-            <ul>
-              {Array.from(predictionsResponse.processed)
-                .toSorted(([x], [y]) =>
-                  x.localeCompare(y, undefined, {
-                    numeric: true,
-                    sensitivity: "base",
-                  })
-                )
-                .map(([routeId, routePatterns]) => {
-                  const route =
-                    predictionsResponse.included.routes.get(routeId)!;
-                  return (
-                    <li key={routeId} className="grid grid-cols-[2rem_auto]">
-                      <h2
-                        className="text-xl font-bold text-[var(--text-color)] bg-[var(--bg-color)] "
-                        style={{
-                          "--text-color": "#" + route.attributes.text_color,
-                          "--bg-color": "#" + route.attributes.color,
-                        }}
-                      >
-                        <span className="sticky top-0 h-min">
-                          {route.attributes.short_name}
-                        </span>
-                      </h2>
-                      <ul>
-                        {Array.from(routePatterns).map(
-                          ([routePatternId, stops]) => {
-                            const routePattern =
-                              predictionsResponse.included.routePatterns.get(
-                                routePatternId
-                              )!;
-                            const headsign =
-                              predictionsResponse.included.trips.get(
-                                [...stops.values()].at(0)!.at(0)!.relationships
-                                  .trip.data.id
-                              )!.attributes.headsign;
-                            return (
-                              <li key={routePatternId}>
-                                <header className="sticky top-0 bg-white flex gap-2 items-center">
-                                  <h3 className="text-lg font-bold">
-                                    {headsign}
-                                  </h3>
-                                  <div className="">({routePattern.id})</div>
-                                </header>
-                                <ul>
-                                  {Array.from(stops)
-                                    .toSorted(([idX], [idY]) => {
-                                      const x =
-                                        predictionsResponse.included.stops.get(
-                                          idX
-                                        )!;
-                                      const y =
-                                        predictionsResponse.included.stops.get(
-                                          idY
-                                        )!;
-                                      return (
-                                        haversine(
-                                          x.attributes,
-                                          location!.coords
-                                        ) -
-                                        haversine(
-                                          y.attributes,
-                                          location!.coords
-                                        )
-                                      );
-                                    })
-                                    .slice(0, 2)
-                                    .map(([stopId, predictions]) => {
-                                      const stop =
-                                        predictionsResponse.included.stops.get(
-                                          stopId
-                                        )!;
-                                      console.log({ stopId });
-                                      return (
-                                        <li key={stopId}>
-                                          <div className="flex gap-2 items-center">
-                                            <span>{stop.attributes.name}</span>
-                                            <span>({stop.id})</span>
-                                            <CopyToClipboard
-                                              text={[
-                                                stop.attributes.longitude,
-                                                stop.attributes.latitude,
-                                              ].join(",")}
-                                            />
-                                          </div>
-                                          <ul>
-                                            {predictions.map((prediction) => {
-                                              return (
-                                                <li
-                                                  key={
-                                                    prediction.relationships
-                                                      .trip.data.id
-                                                  }
-                                                  className="text-sm"
-                                                >
-                                                  <relative-time
-                                                    datetime={
-                                                      prediction.attributes
-                                                        .arrival_time
-                                                    }
-                                                  ></relative-time>
-                                                </li>
-                                              );
-                                            })}
-                                          </ul>
-                                        </li>
-                                      );
-                                    })}
-                                </ul>
-                              </li>
-                            );
-                          }
-                        )}
-                      </ul>
-                    </li>
-                  );
-                })}
-            </ul>
+            <>
+              {predictionsResponse.processed.map(([routeId, routePatterns]) => {
+                const route = predictionsResponse.included.routes.get(routeId)!;
+                const headingId = `route-${routeId}`;
+                return (
+                  <article
+                    key={routeId}
+                    className="grid gap-2"
+                    aria-labelledby={headingId}
+                  >
+                    <h2
+                      id={headingId}
+                      className="text-xl font-bold text-[var(--text-color)] bg-[var(--bg-color)] p-2"
+                      style={{
+                        "--text-color": "#" + route.attributes.text_color,
+                        "--bg-color": "#" + route.attributes.color,
+                      }}
+                    >
+                      {route.attributes.short_name}
+                    </h2>
+                    <ul className="grid gap-2 px-2">
+                      {routePatterns.map(([routePatternId, stops]) => {
+                        // const routePattern =
+                        //   predictionsResponse.included.routePatterns.get(
+                        //     routePatternId
+                        //   )!;
+                        const headsign = predictionsResponse.included.trips.get(
+                          stops.at(0)![1].at(0)!.relationships.trip.data.id
+                        )!.attributes.headsign;
+                        return (
+                          <li key={routePatternId}>
+                            <header className="bg-white flex gap-2 items-center">
+                              <h3 className="text-lg font-bold">{headsign}</h3>
+                            </header>
+                            <>
+                              {stops.map(([stopId, predictions]) => {
+                                const stop =
+                                  predictionsResponse.included.stops.get(
+                                    stopId
+                                  )!;
+
+                                const travelTime = travelTimes?.get(stopId);
+                                return (
+                                  <div key={stopId}>
+                                    <div className="flex gap-2 items-center">
+                                      <span>{stop.attributes.name}</span>
+                                      {/* <span>({stop.id})</span>
+                                      <CopyToClipboard
+                                        text={[
+                                          stop.attributes.longitude,
+                                          stop.attributes.latitude,
+                                        ].join(",")}
+                                      /> */}
+                                      {travelTime?.distance &&
+                                        travelTime?.duration && (
+                                          <span className="inline-flex items-center">
+                                            (
+                                            {travelTime.distance.toLocaleString(
+                                              undefined,
+                                              {
+                                                maximumFractionDigits: 1,
+                                              }
+                                            )}
+                                            mi,{" "}
+                                            {formatSeconds(travelTime.duration)}
+                                            <Fa6.FaPersonWalking className="inline" />
+                                            )
+                                          </span>
+                                        )}
+                                    </div>
+                                    <ul role="list" className="ps-4">
+                                      {predictions.map((prediction) => {
+                                        return (
+                                          <li
+                                            key={
+                                              prediction.relationships.trip.data
+                                                .id
+                                            }
+                                            className="text-sm"
+                                          >
+                                            <relative-time
+                                              datetime={
+                                                prediction.attributes
+                                                  .arrival_time
+                                              }
+                                            ></relative-time>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
+                );
+              })}
+            </>
           )}
         </main>
       </ErrorBoundary>
     </>
   );
 }
-function useLocation() {
+
+function useCurrentPosition() {
   const [location, setLocation] = React.useState<GeolocationPosition | null>(
     null
   );
@@ -190,7 +178,13 @@ function useLocation() {
     window.navigator.geolocation.getCurrentPosition(setLocation);
   }, []);
 
-  return location;
+  // return location;
+  return {
+    coords: {
+      latitude: 42.36,
+      longitude: -71.058,
+    },
+  };
 }
 
 type Prediction = {
@@ -278,7 +272,7 @@ async function fetchPredictions(location: GeolocationPosition) {
   const queryParams = new URLSearchParams({
     "filter[latitude]": location.coords.latitude.toString(),
     "filter[longitude]": location.coords.longitude.toString(),
-    "filter[radius]": "0.01",
+    // "filter[radius]": "0.005",
     "filter[route_type]": "0,1,2,3",
     include: [
       "stop",
@@ -292,6 +286,7 @@ async function fetchPredictions(location: GeolocationPosition) {
     "fields[route]": ["text_color", "short_name", "color"].join(","),
     "fields[stop]": ["name", "longitude", "latitude"].join(","),
     "fields[trip]": ["headsign"].join(","),
+    api_key: import.meta.env.VITE_MBTA_API_KEY!,
   });
 
   const url =
@@ -305,6 +300,7 @@ async function fetchPredictions(location: GeolocationPosition) {
 function usePredictions(location: GeolocationPosition | null) {
   const [predictionsResponse, setPredictionsResponse] =
     React.useState<PredictionsResponse | null>(null);
+
   React.useEffect(() => {
     if (location !== null) {
       void fetchPredictions(location).then(setPredictionsResponse);
@@ -315,31 +311,32 @@ function usePredictions(location: GeolocationPosition | null) {
     return null;
   }
 
-  const stops = new Map<string, Stop>();
-  const routes = new Map<string, Route>();
-  const trips = new Map<string, Trip>();
-  const routePatterns = new Map<string, RoutePattern>();
-  const shapes = new Map<string, Shape>();
+  const included = {
+    stops: new Map<string, Stop>(),
+    routes: new Map<string, Route>(),
+    trips: new Map<string, Trip>(),
+    routePatterns: new Map<string, RoutePattern>(),
+    shapes: new Map<string, Shape>(),
+  };
 
   predictionsResponse.included.forEach((d) => {
     match(d)
       .with({ type: "stop" }, (d) => {
-        stops.set(d.id, d);
+        included.stops.set(d.id, d);
       })
       .with({ type: "route" }, (d) => {
-        routes.set(d.id, d);
+        included.routes.set(d.id, d);
       })
       .with({ type: "trip" }, (d) => {
-        trips.set(d.id, d);
+        included.trips.set(d.id, d);
       })
       .with({ type: "shape" }, (d) => {
-        shapes.set(d.id, d);
+        included.shapes.set(d.id, d);
       })
       .with({ type: "route_pattern" }, (d) => {
-        routePatterns.set(d.id, d);
+        included.routePatterns.set(d.id, d);
       });
   });
-  const included = { stops, routes, trips, routePatterns, shapes };
 
   const routePatternForTrip = (tripId: string): RoutePattern => {
     const trip = included.trips.get(tripId)!;
@@ -347,12 +344,39 @@ function usePredictions(location: GeolocationPosition | null) {
       trip.relationships.route_pattern.data.id
     )!;
   };
-  const processed = d3.group(
+  const processedMap = d3.group(
     predictionsResponse.data,
     (d) => d.relationships.route.data.id,
     (d) => routePatternForTrip(d.relationships.trip.data.id).id,
     (d) => d.relationships.stop.data.id
   );
+  const processed = Array.from(processedMap)
+    .toSorted(([x], [y]) =>
+      x.localeCompare(y, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    )
+    .map(([routeId, routePatterns]) => {
+      return [
+        routeId,
+        Array.from(routePatterns).map(([routePatternId, stops]) => {
+          return [
+            routePatternId,
+            Array.from(stops)
+              .toSorted(([idX], [idY]) => {
+                const x = included.stops.get(idX)!;
+                const y = included.stops.get(idY)!;
+                return (
+                  haversine(x.attributes, location!.coords) -
+                  haversine(y.attributes, location!.coords)
+                );
+              })
+              .slice(0, 1),
+          ] as const;
+        }),
+      ] as const;
+    });
 
   return {
     processed,
@@ -380,4 +404,122 @@ function haversine(
 
   // return RADIUS_OF_EARTH_IN_KM * c;
   return c;
+}
+
+// type Coordinates = {
+//   latitude: number;
+//   longitude: number;
+// };
+
+function useTravelTimes(
+  currentPosition: GeolocationPosition | null,
+  predictionsResponse: ReturnType<typeof usePredictions> | null
+) {
+  const [response, setResponse] = React.useState<MatrixResponse | null>(null);
+  const stops = React.useMemo(() => {
+    if (!predictionsResponse) {
+      return null;
+    }
+    const stopIds = Array.from(
+      new Set(
+        Array.from(predictionsResponse.processed.values()).flatMap(
+          ([, routePatterns]) =>
+            routePatterns.flatMap(([, stops]) =>
+              stops.map(([stopId]) => stopId)
+            )
+        )
+      )
+    );
+    return stopIds.map((id) => {
+      const stop = predictionsResponse.included.stops.get(id)!;
+      return [id, stop.attributes] as const;
+    });
+  }, [predictionsResponse]);
+
+  const url = React.useMemo(() => {
+    if (!currentPosition || !stops) {
+      return null;
+    }
+
+    const locations = [
+      currentPosition.coords,
+      ...stops.map(([, { latitude, longitude }]) => ({ latitude, longitude })),
+    ]
+      .map(({ latitude, longitude }) => `${longitude},${latitude}`)
+      .join(";");
+
+    const queryParams = new URLSearchParams({
+      sources: "0",
+      annotations: "distance,duration",
+      access_token: import.meta.env.VITE_MAPBOX_TOKEN!,
+    });
+
+    return `https://api.mapbox.com/directions-matrix/v1/mapbox/walking/${locations}?${queryParams.toString()}`;
+  }, [currentPosition, stops]);
+
+  React.useEffect(() => {
+    if (url != null) {
+      fetch(url)
+        .then((res) => res.json())
+        .then(setResponse);
+    }
+  }, [url]);
+
+  const processed = React.useMemo(() => {
+    if (!response || !stops) {
+      return null;
+    }
+    console.log(response);
+    const map = new Map<
+      string,
+      { distance: number | null; duration: number | null }
+    >();
+    for (let i = 0; i < stops.length; i++) {
+      const stop = stops[i];
+      const duration = response.durations[0][i + 1];
+      const distance = response.distances[0][i + 1]! * 0.000621371; // convert to miles
+      map.set(stop[0], { distance, duration });
+    }
+
+    return map;
+  }, [response, stops]);
+
+  return processed;
+}
+
+type MatrixResponse = {
+  code: string;
+  distances: Array<(number | null)[]>; // in meters
+  destinations: Destination[];
+  durations: Array<(number | null)[]>; // in seconds
+  sources: Destination[];
+};
+
+export type Destination = {
+  // distance: number;
+  name: string;
+  location: [number, number];
+};
+
+// type Duration = {
+//   seconds?: number;
+//   minutes?: number;
+//   hours?: number;
+// };
+
+function formatSeconds(seconds: number) {
+  // let rounded = Math.round(seconds);
+  const minutes = Math.round(seconds / 60);
+  // rounded %= 60;
+  // const hours = Math.floor(minutes / 60);
+  // minutes %= 60;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new (Intl as any).DurationFormat(undefined, {
+    style: "narrow",
+  }).format({
+    // hours,
+    minutes,
+    // seconds: rounded,
+  });
 }
