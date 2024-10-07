@@ -101,7 +101,7 @@ export function App() {
                         return (
                           <li key={routePatternId}>
                             <header className="bg-white flex gap-2 items-center">
-                              <h3 className="text-lg font-bold">{headsign}</h3>
+                              <h3 className="font-bold">{headsign}</h3>
                             </header>
                             <>
                               {stops.map(([stopId, predictions]) => {
@@ -113,7 +113,7 @@ export function App() {
                                 const travelTime = travelTimes?.get(stopId);
                                 return (
                                   <div key={stopId}>
-                                    <div className="flex gap-2 items-center">
+                                    <div className="flex text-sm gap-2 items-center">
                                       <span>{stop.attributes.name}</span>
                                       {/* <span>({stop.id})</span>
                                       <CopyToClipboard
@@ -135,32 +135,53 @@ export function App() {
                                             mi,{" "}
                                             {formatSeconds(travelTime.duration)}
                                             {/* Hack to center SVG in inline text */}
-                                            <span className="h-3.5 overflow-visible align-baseline inline-block">
-                                              <Fa6.FaPersonWalking className="size-4 " />
+                                            <span className="h-[0.875em] overflow-visible align-baseline inline-block">
+                                              <Fa6.FaPersonWalking className="size-3.5" />
                                             </span>
                                             )
                                           </span>
                                         )}
                                     </div>
                                     <ul role="list" className="ps-4">
-                                      {predictions.map((prediction) => {
-                                        return (
-                                          <li
-                                            key={
-                                              prediction.relationships.trip.data
-                                                .id
-                                            }
-                                            className="text-sm"
-                                          >
-                                            <relative-time
-                                              datetime={
-                                                prediction.attributes
-                                                  .arrival_time
+                                      {predictions
+                                        .toSorted((p1, p2) =>
+                                          (
+                                            p1.attributes.departure_time ??
+                                            p1.attributes.arrival_time
+                                          ).localeCompare(
+                                            p2.attributes.departure_time ??
+                                              p2.attributes.arrival_time
+                                          )
+                                        )
+                                        .map((prediction) => {
+                                          const {
+                                            arrival_time,
+                                            departure_time,
+                                            status,
+                                          } = prediction.attributes;
+                                          return (
+                                            <li
+                                              key={
+                                                prediction.relationships.trip
+                                                  .data.id
                                               }
-                                            ></relative-time>
-                                          </li>
-                                        );
-                                      })}
+                                              className="text-sm"
+                                            >
+                                              {status ??
+                                                (departure_time ? (
+                                                  <relative-time
+                                                    datetime={departure_time}
+                                                  ></relative-time>
+                                                ) : arrival_time ? (
+                                                  <relative-time
+                                                    datetime={arrival_time}
+                                                  ></relative-time>
+                                                ) : (
+                                                  "Oops! Haven’t handled this"
+                                                ))}
+                                            </li>
+                                          );
+                                        })}
                                     </ul>
                                   </div>
                                 );
@@ -205,7 +226,7 @@ type Prediction = {
   attributes: {
     arrival_time: string;
     arrival_uncertainty: number | null;
-    departure_time: string;
+    departure_time: string | null;
     departure_uncertainty: number | null;
     direction_id: number;
     last_trip: boolean;
@@ -298,7 +319,7 @@ function usePredictions(currentCoords: Coordinates | null) {
     const queryParams = new URLSearchParams({
       "filter[latitude]": currentCoords.latitude.toString(),
       "filter[longitude]": currentCoords.longitude.toString(),
-      // "filter[radius]": "0.005",
+      "filter[radius]": "0.005",
       "filter[route_type]": "0,1,2,3",
       include: [
         "stop",
@@ -401,6 +422,7 @@ function usePredictions(currentCoords: Coordinates | null) {
       ] as const;
     });
 
+  // console.log
   return {
     processed,
     included,
