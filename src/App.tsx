@@ -124,7 +124,7 @@ export function App() {
                                       /> */}
                                       {travelTime?.distance &&
                                         travelTime?.duration && (
-                                          <span className="inline-flex items-center">
+                                          <span className="align-middle inline-block">
                                             (
                                             {travelTime.distance.toLocaleString(
                                               undefined,
@@ -134,7 +134,10 @@ export function App() {
                                             )}
                                             mi,{" "}
                                             {formatSeconds(travelTime.duration)}
-                                            <Fa6.FaPersonWalking className="inline" />
+                                            {/* Hack to center SVG in inline text */}
+                                            <span className="h-3.5 overflow-visible align-baseline inline-block">
+                                              <Fa6.FaPersonWalking className="size-4 " />
+                                            </span>
                                             )
                                           </span>
                                         )}
