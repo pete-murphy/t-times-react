@@ -8,8 +8,11 @@ import * as Fa6 from "react-icons/fa6";
 
 export function App() {
   const currentPosition = useCurrentPosition();
-  const predictionsResponse = usePredictions(currentPosition);
-  const travelTimes = useTravelTimes(currentPosition, predictionsResponse);
+  const predictionsResponse = usePredictions(currentPosition.coords);
+  const travelTimes = useTravelTimes(
+    currentPosition.coords,
+    predictionsResponse
+  );
 
   if (!predictionsResponse) {
     return <main>Loading...</main>;
@@ -58,12 +61,18 @@ export function App() {
           );
         }}
       >
-        <main className="p-2 flex flex-col gap-8">
+        <main className="p-2 flex flex-col gap-8 max-w-md">
           {predictionsResponse && (
             <>
               {predictionsResponse.processed.map(([routeId, routePatterns]) => {
                 const route = predictionsResponse.included.routes.get(routeId)!;
                 const headingId = `route-${routeId}`;
+                const displayName = [
+                  route.attributes.short_name,
+                  route.attributes.long_name.replace(/ Line$/, ""),
+                ]
+                  .filter(Boolean)
+                  .slice(0, 1);
                 return (
                   <article
                     key={routeId}
@@ -78,7 +87,7 @@ export function App() {
                         "--bg-color": "#" + route.attributes.color,
                       }}
                     >
-                      {route.attributes.short_name}
+                      {displayName}
                     </h2>
                     <ul className="grid gap-2 px-2">
                       {routePatterns.map(([routePatternId, stops]) => {
@@ -180,6 +189,7 @@ function useCurrentPosition() {
 
   // return location;
   return {
+    ...location,
     coords: {
       latitude: 42.36,
       longitude: -71.058,
@@ -232,6 +242,7 @@ type Route = {
   attributes: {
     color: string;
     short_name: string; // "10"
+    long_name: string; //
     text_color: string;
   };
   relationships: {
@@ -268,46 +279,55 @@ type PredictionsResponse = {
   included: Array<Stop | Trip | Shape | Route | RoutePattern>;
 };
 
-async function fetchPredictions(location: GeolocationPosition) {
-  const queryParams = new URLSearchParams({
-    "filter[latitude]": location.coords.latitude.toString(),
-    "filter[longitude]": location.coords.longitude.toString(),
-    // "filter[radius]": "0.005",
-    "filter[route_type]": "0,1,2,3",
-    include: [
-      "stop",
-      "route",
-      "trip",
-      "vehicle",
-      "route.route_patterns.representative_trip.shape",
-    ].join(","),
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
 
-    fields: ["arrival_time", "departure_time", "arrival_uncertainty"].join(","),
-    "fields[route]": ["text_color", "short_name", "color"].join(","),
-    "fields[stop]": ["name", "longitude", "latitude"].join(","),
-    "fields[trip]": ["headsign"].join(","),
-    api_key: import.meta.env.VITE_MBTA_API_KEY!,
-  });
-
-  const url =
-    `https://api-v3.mbta.com/predictions` + "?" + queryParams.toString();
-
-  const response = await fetch(url).then((res) => res.json());
-
-  return response;
-}
-
-function usePredictions(location: GeolocationPosition | null) {
+function usePredictions(currentCoords: Coordinates | null) {
   const [predictionsResponse, setPredictionsResponse] =
     React.useState<PredictionsResponse | null>(null);
 
-  React.useEffect(() => {
-    if (location !== null) {
-      void fetchPredictions(location).then(setPredictionsResponse);
+  const url = React.useMemo(() => {
+    if (currentCoords === null) {
+      return null;
     }
-  }, [location]);
+    const queryParams = new URLSearchParams({
+      "filter[latitude]": currentCoords.latitude.toString(),
+      "filter[longitude]": currentCoords.longitude.toString(),
+      // "filter[radius]": "0.005",
+      "filter[route_type]": "0,1,2,3",
+      include: [
+        "stop",
+        "route",
+        "trip",
+        "vehicle",
+        "route.route_patterns.representative_trip.shape",
+      ].join(","),
 
-  if (!predictionsResponse) {
+      fields: ["arrival_time", "departure_time", "arrival_uncertainty"].join(
+        ","
+      ),
+      "fields[route]": ["text_color", "short_name", "long_name", "color"].join(
+        ","
+      ),
+      "fields[stop]": ["name", "longitude", "latitude"].join(","),
+      "fields[trip]": ["headsign"].join(","),
+      api_key: import.meta.env.VITE_MBTA_API_KEY!,
+    });
+
+    return `https://api-v3.mbta.com/predictions` + "?" + queryParams.toString();
+  }, [currentCoords]);
+
+  React.useEffect(() => {
+    if (url) {
+      fetch(url)
+        .then((res) => res.json())
+        .then(setPredictionsResponse);
+    }
+  }, [url]);
+
+  if (!predictionsResponse || !currentCoords) {
     return null;
   }
 
@@ -368,8 +388,8 @@ function usePredictions(location: GeolocationPosition | null) {
                 const x = included.stops.get(idX)!;
                 const y = included.stops.get(idY)!;
                 return (
-                  haversine(x.attributes, location!.coords) -
-                  haversine(y.attributes, location!.coords)
+                  haversine(x.attributes, currentCoords) -
+                  haversine(y.attributes, currentCoords)
                 );
               })
               .slice(0, 1),
@@ -406,13 +426,8 @@ function haversine(
   return c;
 }
 
-// type Coordinates = {
-//   latitude: number;
-//   longitude: number;
-// };
-
 function useTravelTimes(
-  currentPosition: GeolocationPosition | null,
+  currentCoords: Coordinates | null,
   predictionsResponse: ReturnType<typeof usePredictions> | null
 ) {
   const [response, setResponse] = React.useState<MatrixResponse | null>(null);
@@ -437,15 +452,16 @@ function useTravelTimes(
   }, [predictionsResponse]);
 
   const url = React.useMemo(() => {
-    if (!currentPosition || !stops) {
+    if (!currentCoords || !stops) {
       return null;
     }
 
     const locations = [
-      currentPosition.coords,
+      currentCoords,
       ...stops.map(([, { latitude, longitude }]) => ({ latitude, longitude })),
     ]
       .map(({ latitude, longitude }) => `${longitude},${latitude}`)
+      .slice(0, 24) // TODO: handle more than 25 stops
       .join(";");
 
     const queryParams = new URLSearchParams({
@@ -455,7 +471,7 @@ function useTravelTimes(
     });
 
     return `https://api.mapbox.com/directions-matrix/v1/mapbox/walking/${locations}?${queryParams.toString()}`;
-  }, [currentPosition, stops]);
+  }, [currentCoords, stops]);
 
   React.useEffect(() => {
     if (url != null) {
@@ -469,15 +485,18 @@ function useTravelTimes(
     if (!response || !stops) {
       return null;
     }
-    console.log(response);
+
     const map = new Map<
       string,
       { distance: number | null; duration: number | null }
     >();
     for (let i = 0; i < stops.length; i++) {
       const stop = stops[i];
-      const duration = response.durations[0][i + 1];
-      const distance = response.distances[0][i + 1]! * 0.000621371; // convert to miles
+      const duration = response.durations[0][i + 1] ?? null;
+      let distance = response.distances[0][i + 1] ?? null;
+      if (distance != null) {
+        distance *= 0.000621371; // convert to miles
+      }
       map.set(stop[0], { distance, duration });
     }
 
