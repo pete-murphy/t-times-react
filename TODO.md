@@ -8,3 +8,7 @@
 
 - [ ] Accordion pattern
 - [ ] Pin/favorite a stop (and route-pattern?) `favorites: Array<${routePatternId}-${stopId}>`
+
+Map stuff:
+
+- [x] Render a map

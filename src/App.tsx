@@ -5,6 +5,7 @@ import { ErrorBoundary, FallbackProps } from "react-error-boundary";
 import "@github/relative-time-element";
 // import { CopyToClipboard } from "./CopyToClipboard";
 import * as Fa6 from "react-icons/fa6";
+import { MapView } from "./MapView";
 
 export function App() {
   const currentPosition = useCurrentPosition();
@@ -19,7 +20,7 @@ export function App() {
   }
 
   return (
-    <>
+    <div className="h-dvh">
       <header className="p-2">
         <h1 className="flex items-center">
           <svg
@@ -61,9 +62,9 @@ export function App() {
           );
         }}
       >
-        <main className="p-2 flex flex-col gap-8 max-w-md">
+        <main className="grid grid-cols-2">
           {predictionsResponse && (
-            <>
+            <div className="p-2 max-w-md flex flex-col gap-8 max-h-full">
               {predictionsResponse.processed.map(([routeId, routePatterns]) => {
                 const route = predictionsResponse.included.routes.get(routeId)!;
                 const headingId = `route-${routeId}`;
@@ -109,81 +110,21 @@ export function App() {
                                   predictionsResponse.included.stops.get(
                                     stopId
                                   )!;
+                                const { distance, duration } = travelTimes?.get(
+                                  stopId
+                                ) ?? { distance: null, duration: null };
 
-                                const travelTime = travelTimes?.get(stopId);
                                 return (
-                                  <div key={stopId}>
-                                    <div className="flex text-sm gap-2 items-center">
-                                      <span>{stop.attributes.name}</span>
-                                      {/* <span>({stop.id})</span>
-                                      <CopyToClipboard
-                                        text={[
-                                          stop.attributes.longitude,
-                                          stop.attributes.latitude,
-                                        ].join(",")}
-                                      /> */}
-                                      {travelTime?.distance &&
-                                        travelTime?.duration && (
-                                          <span className="align-middle inline-block">
-                                            (
-                                            {travelTime.distance.toLocaleString(
-                                              undefined,
-                                              {
-                                                maximumFractionDigits: 1,
-                                              }
-                                            )}
-                                            mi,{" "}
-                                            {formatSeconds(travelTime.duration)}
-                                            {/* Hack to center SVG in inline text */}
-                                            <span className="h-[0.875em] overflow-visible align-baseline inline-block">
-                                              <Fa6.FaPersonWalking className="size-3.5" />
-                                            </span>
-                                            )
-                                          </span>
-                                        )}
-                                    </div>
-                                    <ul role="list" className="ps-4">
-                                      {predictions
-                                        .toSorted((p1, p2) =>
-                                          (
-                                            p1.attributes.departure_time ??
-                                            p1.attributes.arrival_time
-                                          ).localeCompare(
-                                            p2.attributes.departure_time ??
-                                              p2.attributes.arrival_time
-                                          )
-                                        )
-                                        .map((prediction) => {
-                                          const {
-                                            arrival_time,
-                                            departure_time,
-                                            status,
-                                          } = prediction.attributes;
-                                          return (
-                                            <li
-                                              key={
-                                                prediction.relationships.trip
-                                                  .data.id
-                                              }
-                                              className="text-sm"
-                                            >
-                                              {status ??
-                                                (departure_time ? (
-                                                  <relative-time
-                                                    datetime={departure_time}
-                                                  ></relative-time>
-                                                ) : arrival_time ? (
-                                                  <relative-time
-                                                    datetime={arrival_time}
-                                                  ></relative-time>
-                                                ) : (
-                                                  "Oops! Haven’t handled this"
-                                                ))}
-                                            </li>
-                                          );
-                                        })}
-                                    </ul>
-                                  </div>
+                                  <Stop
+                                    stop={stop}
+                                    travelTime={
+                                      distance && duration
+                                        ? { distance, duration }
+                                        : null
+                                    }
+                                    predictions={predictions}
+                                    key={stopId}
+                                  />
                                 );
                               })}
                             </>
@@ -194,11 +135,87 @@ export function App() {
                   </article>
                 );
               })}
-            </>
+            </div>
           )}
+          <MapView
+            currentCoordinates={currentPosition.coords}
+            style={{
+              maxHeight: "100dvh",
+              font: "inherit",
+              fontSize: "0.75rem",
+            }}
+            vehicles={[]}
+          />
         </main>
       </ErrorBoundary>
-    </>
+    </div>
+  );
+}
+
+function Stop(props: {
+  stop: Stop;
+  travelTime?: { distance: number; duration: number } | null;
+  predictions: Array<Prediction>;
+}) {
+  const { stop, travelTime, predictions } = props;
+  return (
+    <div>
+      <div className="flex text-sm gap-2 items-center">
+        <span>{stop.attributes.name}</span>
+        {/* <span>({stop.id})</span>
+        <CopyToClipboard
+          text={[
+            stop.attributes.longitude,
+            stop.attributes.latitude,
+          ].join(",")}
+        /> */}
+        {travelTime?.distance && travelTime?.duration && (
+          <span className="align-middle inline-block tabular-nums">
+            (
+            {travelTime.distance.toLocaleString(undefined, {
+              maximumFractionDigits: 1,
+            })}
+            mi, {formatSeconds(travelTime.duration)}
+            {/* Hack to center SVG in inline text */}
+            <span className="h-[0.875em] overflow-visible align-baseline inline-block">
+              <Fa6.FaPersonWalking className="size-3.5" />
+            </span>
+            )
+          </span>
+        )}
+      </div>
+      <ul role="list" className="ps-4 text-end">
+        {predictions
+          .toSorted((p1, p2) =>
+            (
+              p1.attributes.departure_time ??
+              p1.attributes.arrival_time ??
+              ""
+            ).localeCompare(
+              p2.attributes.departure_time ?? p2.attributes.arrival_time ?? ""
+            )
+          )
+          .map((prediction) => {
+            const { arrival_time, departure_time, status } =
+              prediction.attributes;
+            return (
+              <li
+                key={prediction.relationships.trip.data.id}
+                className="text-sm tabular-nums"
+              >
+                {status ??
+                  (departure_time ? (
+                    <relative-time datetime={departure_time}></relative-time>
+                  ) : arrival_time ? (
+                    <relative-time datetime={arrival_time}></relative-time>
+                  ) : (
+                    "Oops! Haven’t handled this"
+                  ))}
+              </li>
+            );
+          })}
+      </ul>
+    </div>
   );
 }
 
