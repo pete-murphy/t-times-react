@@ -2,7 +2,9 @@ import * as React from "react";
 import { match } from "ts-pattern";
 import * as d3 from "d3";
 
-export function useCurrentPosition(): GeolocationPosition | null {
+export function useCurrentPosition(params?: {
+  override?: Coordinates;
+}): GeolocationPosition | null {
   const [location, setLocation] = React.useState<GeolocationPosition | null>(
     null
   );
@@ -11,16 +13,19 @@ export function useCurrentPosition(): GeolocationPosition | null {
     window.navigator.geolocation.getCurrentPosition(setLocation);
   }, []);
 
-  return location != null
-    ? {
+  if (params?.override != null) {
+    if (location != null) {
+      return {
         ...location,
         coords: {
           ...location.coords,
-          latitude: 42.36,
-          longitude: -71.058,
+          ...params.override,
         },
-      }
-    : null;
+      };
+    }
+    return null;
+  }
+  return location;
 }
 
 export type Prediction = {
@@ -185,7 +190,12 @@ export function usePredictions(currentCoords: Coordinates | null) {
   });
 
   const routePatternForTrip = (tripId: string): RoutePattern => {
-    const trip = included.trips.get(tripId)!;
+    const trip = included.trips.get(tripId);
+    if (!trip || !trip.relationships.route_pattern.data?.id) {
+      console.log(trip);
+      console.log(trip?.relationships.route_pattern);
+      throw new Error("Trip not found");
+    }
     return included.routePatterns.get(
       trip.relationships.route_pattern.data.id
     )!;
@@ -224,10 +234,27 @@ export function usePredictions(currentCoords: Coordinates | null) {
       ] as const;
     });
 
+  const flattened = {
+    // stops: processed.flatMap(([routeId, routePatterns]) => {
+    //   return routePatterns.flatMap(([routePatternId, stops]) =>
+    //     stops.map(([stopId, _]) => {
+    //       const stop = included.stops.get(stopId)!;
+    //       return {
+    //         stop,
+    //         route: included.routes.get(routeId)!,
+    //         routePattern: included.routePatterns.get(routePatternId)!,
+    //       };
+    //     })
+    //   );
+    // }),
+    // colorForStop:
+  };
+
   // console.log
   return {
     processed,
     included,
+    flattened,
   };
 }
 

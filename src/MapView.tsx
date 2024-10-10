@@ -5,19 +5,14 @@ import * as ReactDOM from "react-dom";
 // import { type Stop } from "./App";
 
 type Props = {
+  padding: {
+    bottom: number;
+  };
   currentCoordinates: {
     latitude: number;
     longitude: number;
   };
-  vehicles: Array<{
-    id: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-    bearing: number;
-  }>;
-  stops: Array<{
+  markerData: Array<{
     id: string;
     coordinates: {
       latitude: number;
@@ -25,16 +20,12 @@ type Props = {
     };
     node: React.ReactNode;
   }>;
-
   style?: React.CSSProperties;
 };
 
 export function MapView(props: Props) {
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<MapBoxGL.Map | null>(null);
-  const [currentMarkers, setCurrentMarkers] = React.useState<
-    Array<MapBoxGL.Marker>
-  >([]);
   const [stopMarkers, setStopMarkers] = React.useState<
     Array<{
       marker: MapBoxGL.Marker;
@@ -59,7 +50,7 @@ export function MapView(props: Props) {
         props.currentCoordinates.longitude,
         props.currentCoordinates.latitude,
       ],
-      zoom: 16,
+      zoom: 14,
       accessToken: import.meta.env.VITE_MAPBOX_TOKEN!,
     });
 
@@ -69,21 +60,28 @@ export function MapView(props: Props) {
   }, [props.currentCoordinates.latitude, props.currentCoordinates.longitude]);
 
   React.useEffect(() => {
-    if (mapRef.current == null) return;
+    if (mapRef.current) {
+      mapRef.current.easeTo({ padding: props.padding, duration: 500 });
+      // mapRef.current.resize();
+    }
+  }, [props.padding]);
 
-    const marker = new MapBoxGL.Marker({
-      element: document.createElement("div"),
-    });
-    marker.setLngLat([
-      props.currentCoordinates.longitude,
-      props.currentCoordinates.latitude,
-    ]);
-    marker.addTo(mapRef.current);
-    setCurrentMarkers([marker]);
-    return () => {
-      marker.remove();
-    };
-  }, [props.currentCoordinates.latitude, props.currentCoordinates.longitude]);
+  // React.useEffect(() => {
+  //   if (mapRef.current == null) return;
+
+  //   const marker = new MapBoxGL.Marker({
+  //     element: document.createElement("div"),
+  //   });
+  //   marker.setLngLat([
+  //     props.currentCoordinates.longitude,
+  //     props.currentCoordinates.latitude,
+  //   ]);
+  //   marker.addTo(mapRef.current);
+  //   setCurrentMarkers([marker]);
+  //   return () => {
+  //     marker.remove();
+  //   };
+  // }, [props.currentCoordinates.latitude, props.currentCoordinates.longitude]);
 
   React.useEffect(() => {
     if (mapRef.current == null) return;
@@ -103,13 +101,13 @@ export function MapView(props: Props) {
       }
     > = new Map();
 
-    props.stops.forEach((stop) => {
+    props.markerData.forEach((d) => {
       const marker = new MapBoxGL.Marker({
         element: document.createElement("div"),
       });
-      marker.setLngLat([stop.coordinates.longitude, stop.coordinates.latitude]);
+      marker.setLngLat([d.coordinates.longitude, d.coordinates.latitude]);
       marker.addTo(mapRef.current!);
-      stopMap.set(stop.id, { marker, data: stop });
+      stopMap.set(d.id, { marker, data: d });
     });
     // setStopMarkers((currentMarkers) => {
     //   currentMarkers.forEach((marker) => marker.remove());
@@ -119,17 +117,11 @@ export function MapView(props: Props) {
     return () => {
       stopMap.forEach(({ marker }) => marker.remove());
     };
-  }, [props.stops]);
+  }, [props.markerData]);
 
   return (
     <>
       <div ref={mapContainerRef} style={props.style} />
-      {currentMarkers.map((marker) =>
-        ReactDOM.createPortal(
-          <button className="bg-red-200 px-2 py-1 rounded-full">Hello</button>,
-          marker.getElement()
-        )
-      )}
       {stopMarkers.map(({ marker, data }) =>
         ReactDOM.createPortal(data.node, marker.getElement())
       )}

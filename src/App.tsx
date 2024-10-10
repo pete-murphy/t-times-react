@@ -1,16 +1,33 @@
+import * as React from "react";
+import * as ReactUse from "react-use";
+
 import { useCurrentPosition, usePredictions, useTravelTimes } from "./data";
 import { Drawer } from "./Drawer";
 import { MapView } from "./MapView";
-import * as React from "react";
 import { TimesList } from "./TimesList";
 
+const snapPoints = [0.15, 0.5, 0.95];
+
 export function App() {
-  const currentPosition = useCurrentPosition();
+  const currentPosition = useCurrentPosition({
+    override: {
+      latitude: 42.3551,
+      longitude: -71.0656,
+    },
+  });
   const predictionsResponse = usePredictions(currentPosition?.coords ?? null);
   const travelTimes = useTravelTimes(
     currentPosition?.coords ?? null,
     predictionsResponse
   );
+
+  // const isWide = ReactUse.useMedia("(min-width: 640px)");
+  const isWide = false; // TODOn't
+
+  // TODOn't: rely on window size
+  const windowSize = ReactUse.useWindowSize();
+
+  const [snap, setSnap] = React.useState<number>(snapPoints.at(1)!);
 
   if (!predictionsResponse) {
     return <main>Loading...</main>;
@@ -22,34 +39,56 @@ export function App() {
   return (
     <main className="h-dvh flex flex-col">
       <MapView
+        padding={{
+          bottom: Math.min(snap, snapPoints.at(1)!) * windowSize.height,
+        }}
         currentCoordinates={currentPosition.coords}
         style={{
           position: "absolute",
           inset: 0,
           height: "100%",
-          gridArea: "1/-1",
-          // height: "100dvh",
-          // maxHeight: "100dvh",
+          // gridArea: "1/-1",
           font: "inherit",
           fontSize: "0.75rem",
         }}
-        vehicles={[]}
-        stops={Array.from(predictionsResponse.included.stops.entries()).map(
-          ([stopId, stop]) => ({
-            id: stopId,
-            coordinates: {
-              latitude: stop.attributes.latitude,
-              longitude: stop.attributes.longitude,
-            },
-            node: (
-              <div className="bg-white p-1 rounded-md">
-                {stop.attributes.name}
-              </div>
-            ),
+        markerData={Array.from(predictionsResponse.included.stops.entries())
+          .map(([stopId, stop]) => {
+            return {
+              id: stopId,
+              coordinates: {
+                latitude: stop.attributes.latitude,
+                longitude: stop.attributes.longitude,
+              },
+              node: (
+                <div
+                  className="bg-white/50 outline outline-[var(--outline-color)] outline-2 rounded-full size-2"
+                  style={{
+                    outlineColor: "#999",
+                  }}
+                />
+              ),
+            };
           })
-        )}
+          .concat([
+            {
+              id: "me",
+              coordinates: currentPosition.coords,
+              node: (
+                <div className="grid [&>*]:[grid-area:1/-1] place-items-center">
+                  <div className="bg-white rounded-full size-5 shadow-md" />
+                  <div className="bg-blue-500 animate-in-out o rounded-full size-4" />
+                </div>
+              ),
+            },
+          ])}
       />
-      <Drawer>
+      <Drawer
+        drawerHeight={windowSize.height * snap}
+        isWide={isWide}
+        setSnap={setSnap}
+        snap={snap}
+        snapPoints={snapPoints}
+      >
         <TimesList
           predictionsResponse={predictionsResponse}
           travelTimes={travelTimes}
