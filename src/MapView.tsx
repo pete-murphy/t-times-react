@@ -105,7 +105,7 @@ export function MapView(props: Props) {
       if (mapRef.current == null) return;
 
       // TODO: better way of making/using a blue dot?
-      mapRef.current.loadImage("/img/dot-3.png", (error, image) => {
+      mapRef.current.loadImage("/img/dot.png", (error, image) => {
         if (error) throw error;
         if (mapRef.current == null) return;
 
