@@ -135,7 +135,7 @@ export function MapView(props: Props) {
           },
         });
 
-        const lineBaseWidth = 14;
+        const lineBaseWidth = 12;
 
         mapRef.current.addLayer({
           id: "route-line",

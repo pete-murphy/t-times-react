@@ -10,7 +10,15 @@ export function useCurrentPosition(params?: {
   );
 
   React.useEffect(() => {
-    window.navigator.geolocation.getCurrentPosition(setLocation);
+    // window.navigator.geolocation.getCurrentPosition(setLocation);
+    setLocation({
+      coords: {
+        accuracy: 0,
+        altitude: null,
+        latitude: 42.3551,
+        longitude: -71.0656,
+      },
+    } as GeolocationPosition);
   }, []);
 
   if (params?.override != null) {
