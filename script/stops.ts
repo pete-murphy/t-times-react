@@ -1,4 +1,4 @@
-import stopsJSON from "./stops.json";
+// import stopsJSON from "./stops.json";
 
 // {
 //   "attributes": {
@@ -39,16 +39,16 @@ import stopsJSON from "./stops.json";
 //   "type": "stop"
 // }
 
-type Stop = {
-  attributes: {
-    latitude: number;
-    longitude: number;
-    name: string;
-  };
-  id: string;
-};
+// type Stop = {
+//   attributes: {
+//     latitude: number;
+//     longitude: number;
+//     name: string;
+//   };
+//   id: string;
+// };
 
-async function fetchIsochrones({
+export async function fetchIsochrones({
   latitude,
   longitude,
 }: {
@@ -56,15 +56,16 @@ async function fetchIsochrones({
   longitude: number;
 }) {
   // TODO
+  console.error("fetchIsochrones not implemented", { latitude, longitude });
 }
 
-async function main() {
-  const stops = (
-    stopsJSON as unknown as {
-      data: Stop[];
-    }
-  ).data;
-  for (const stop of stops) {
-    console.log(stop.attributes.name);
-  }
-}
+// async function main() {
+//   const stops = (
+//     stopsJSON as unknown as {
+//       data: Stop[];
+//     }
+//   ).data;
+//   for (const stop of stops) {
+//     console.log(stop.attributes.name);
+//   }
+// }

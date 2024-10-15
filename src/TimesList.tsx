@@ -1,4 +1,3 @@
-import React from "react";
 import "@github/relative-time-element";
 // import { CopyToClipboard } from "./CopyToClipboard";
 import * as Fa6 from "react-icons/fa6";

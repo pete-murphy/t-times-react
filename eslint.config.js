@@ -7,7 +7,7 @@ import react from "eslint-plugin-react";
 
 export default tseslint.config(
   {
-    ignores: ["dist", "src"],
+    ignores: ["dist"],
     settings: { react: { version: "18.3" } },
     plugins: { react },
     rules: {
