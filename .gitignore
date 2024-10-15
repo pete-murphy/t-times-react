@@ -26,3 +26,5 @@ dist-ssr
 .env
 __json/
 script/*.json
+
+*.tsbuildinfo
